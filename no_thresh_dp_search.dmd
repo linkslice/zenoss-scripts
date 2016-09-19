@@ -1,0 +1,63 @@
+######
+# Print off a list of datapoints that are not in a threshold
+# Use: zendmd --script=no_thresh_dp_search.dmd
+######
+
+import StringIO
+import re
+
+global deviceRRDCache
+RRDTemplateDeviceCache = {}
+
+def populateDeviceRRDCache(device):
+    deviceId = device.getPrimaryDmdId()
+    rrdNames = []
+    for i in device.getRRDTemplates():
+        templateName = i.getPrimaryDmdId()
+        if not RRDTemplateDeviceCache.has_key(templateName):
+            RRDTemplateDeviceCache[templateName] = []
+        if deviceId not in RRDTemplateDeviceCache[templateName]:
+            RRDTemplateDeviceCache[templateName].append(deviceId)
+    for i in device.getDeviceComponents():
+        for j in i.getRRDTemplates():
+            templateName = j.getPrimaryDmdId()
+            if not RRDTemplateDeviceCache.has_key(templateName):
+                RRDTemplateDeviceCache[templateName] = []
+            if deviceId not in RRDTemplateDeviceCache[templateName]:
+                RRDTemplateDeviceCache[templateName].append(deviceId)
+
+def deviceRRD():
+    for i in devices.getSubDevices():
+        populateDeviceRRDCache(i)
+
+deviceRRD()
+
+for template in devices.getAllRRDTemplates():
+    for pointname in template.getRRDDataPointNames():
+        in_threshold = False
+        for threshold in template.thresholds():
+            if pointname in threshold.getDataPointNamesString():
+                in_threshold = True
+                break
+        if in_threshold:
+            continue
+        print "%s :: %s" % (template.getPrimaryDmdId(), pointname)        
+        theclass = template.deviceClass()
+        if theclass:
+            print "    Device Class: %s" % theclass.getPrimaryDmdId()
+            devcount = 0
+            devout = StringIO.StringIO()
+            if RRDTemplateDeviceCache.has_key(template.getPrimaryDmdId()):
+                for device in RRDTemplateDeviceCache[template.getPrimaryDmdId()]:
+                    devout.write( "            %s\n" % (device))
+                    devcount = devcount + 1
+                if devcount > 0:
+                    print "        Devices:"
+                    print devout.getvalue()
+        else:
+            devname = re.compile((".+\/devices\/(.+)\/%s" % re.escape(template.getId())))
+            thename = devname.match(template.getPrimaryDmdId())
+            if thename:
+                print "    Local template for Device: %s" % (thename.groups()[0])
+        print ""
+
